@@ -69,6 +69,7 @@ def draw_environment(screen, rock_image, tile_img, players, coordinates):
         screen.blit(tile_img, (i * SQUARE_SIZE, 0))
         screen.blit(tile_img, (i * SQUARE_SIZE, SCREEN_HEIGHT - SQUARE_SIZE))
 
+    # Draw the inner squares
     for coord in coordinates:
         screen.blit(tile_img, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
 
