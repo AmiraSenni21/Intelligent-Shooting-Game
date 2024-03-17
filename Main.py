@@ -3,7 +3,7 @@ import sys
 from moviepy.editor import VideoFileClip
 import random
 import time
-from pygame.locals import *
+
 
 # Constants
 SQUARE_SIZE = 60
@@ -12,19 +12,20 @@ SCREEN_HEIGHT = SQUARE_SIZE * 12  # 12 squares
 LINE_WIDTH = 2
 GRAY = (150, 150, 150)
 BLACK = (0, 0, 0)
-NPCs_MOVE_DELAY = 0.5  # speed of NPCs
-PLAYER_MOVE_DELAY = 0.2  # the speed of player movement
-
+NPCs_MOVE_DELAY = 0.5  # Speed of NPCs
+PLAYER_MOVE_DELAY = 0.2  # The speed of player movement
+Bullet_Time = 0.3  # Time between shots (in seconds)
 
 class Player:
     def __init__(self, images, x, y, initial_image_index):
         self.images = images
-        self.image_index = initial_image_index  # ------- remove one of them in the end ------
-        self.image = self.images[self.image_index]
+        self.image = self.images[initial_image_index]
         self.rect = self.image.get_rect()
         self.rect.topleft = (x * SQUARE_SIZE, y * SQUARE_SIZE)  # Intial position of the player
         self.last_move_time = time.time()  # tracking the time of the last movement.
+        self.last_shot_time = time.time()  # tracking the time of the last shot.
 
+    #Draw the player's image onto the game screen
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
@@ -52,7 +53,6 @@ class Player:
                 self.image = self.images[self.image_index]
                 self.last_move_time = current_time  # Update the last move time
                 return True
-
         return False
 
     def random_move(self, obstacles):
@@ -68,6 +68,15 @@ class Player:
                 # Update the position
                 self.rect.x, self.rect.y = new_x, new_y
                 self.last_move_time = current_time  # Update the last move time
+
+    # Check if the player can shoot
+    def can_shoot(self):
+        current_time = time.time()
+        return current_time - self.last_shot_time >= Bullet_Time
+
+   # To get the shooting time
+    def shoot(self):
+        self.last_shot_time = time.time()
 
 class Bullet:
     def __init__(self, x, y, dx, dy, image):
@@ -85,19 +94,21 @@ class Bullet:
         screen.blit(self.image, self.rect)
 
 def shoot(player, bullets, bullet_image):
-    # Determine bullet direction based on player direction
-    if player.image_index == 0:  # Up
-        dx, dy = 0, -1
-    elif player.image_index == 1:  # Down
-        dx, dy = 0, 1
-    elif player.image_index == 2:  # Left
-        dx, dy = -1, 0
-    elif player.image_index == 3:  # Right
-        dx, dy = 1, 0
+    if player.can_shoot():
+        # Determine bullet direction based on player direction
+        if player.image_index == 0:  # Up
+            dx, dy = 0, -1
+        elif player.image_index == 1:  # Down
+            dx, dy = 0, 1
+        elif player.image_index == 2:  # Left
+            dx, dy = -1, 0
+        elif player.image_index == 3:  # Right
+            dx, dy = 1, 0
 
-    # Create a bullet and add it to the bullets list
-    bullet = Bullet(player.rect.centerx, player.rect.centery, dx * 20, dy * 20, bullet_image)
-    bullets.append(bullet)
+        # Create a bullet and add it to the bullets list
+        bullet = Bullet(player.rect.centerx, player.rect.centery, dx * 25, dy * 25, bullet_image)
+        bullets.append(bullet)  # This list is used to keep track of all the bullets currently active in the game.
+        player.shoot()
 
 def draw_environment(screen, box_img, tile_img, players, coordinates, bullets):
     # Draw the black squares and the gray lines of the environment
@@ -133,8 +144,6 @@ def draw_environment(screen, box_img, tile_img, players, coordinates, bullets):
     # Draw bullets
     for bullet in bullets:
         bullet.draw(screen)
-
-
 
 def main():
     pygame.init()
@@ -204,8 +213,8 @@ def main():
     tile_img = pygame.transform.scale(tile_img, (SQUARE_SIZE, SQUARE_SIZE))
 
     # Load bullet image
-    bullet_image = pygame.image.load("Images/Obstacles/shoot.png")
-    bullet_image = pygame.transform.scale(bullet_image, (20, 20))  # Adjust size as needed
+    bullet_image = pygame.image.load("Images/Obstacles/Bullet.png")
+    bullet_image = pygame.transform.scale(bullet_image, (10, 10))
 
     # List to store bullets
     bullets = []
@@ -234,7 +243,7 @@ def main():
         for bullet in bullets:
             bullet.move()
             bullet.draw(screen)
-        # Random movement for AI-controlled players
+        # Random movement for NPCs players
         for player in players[1:]:
             player.random_move(obstacle_rects)
 
