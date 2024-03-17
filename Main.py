@@ -1,6 +1,8 @@
 import pygame
 import sys
 from moviepy.editor import VideoFileClip
+import random
+import time
 from pygame.locals import *
 
 # Constants
@@ -10,48 +12,94 @@ SCREEN_HEIGHT = SQUARE_SIZE * 12  # 12 squares
 LINE_WIDTH = 2
 GRAY = (150, 150, 150)
 BLACK = (0, 0, 0)
+NPCs_MOVE_DELAY = 0.5  # speed of NPCs
+PLAYER_MOVE_DELAY = 0.2  # the speed of player movement
+
 
 class Player:
     def __init__(self, images, x, y, initial_image_index):
         self.images = images
-        self.image_index = initial_image_index
+        self.image_index = initial_image_index  # ------- remove one of them in the end ------
         self.image = self.images[self.image_index]
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x * SQUARE_SIZE, y * SQUARE_SIZE)
+        self.rect.topleft = (x * SQUARE_SIZE, y * SQUARE_SIZE)  # Intial position of the player
+        self.last_move_time = time.time()  # tracking the time of the last movement.
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
     def move(self, dx, dy, obstacles):
-        # Save the current position
-        old_x, old_y = self.rect.x, self.rect.y
+        current_time = time.time()
+        if current_time - self.last_move_time >= PLAYER_MOVE_DELAY:
+            # Calculate the new position
+            new_x, new_y = self.rect.x + dx * SQUARE_SIZE, self.rect.y + dy * SQUARE_SIZE
 
-        # Move the player
-        self.rect.x += dx * SQUARE_SIZE
-        self.rect.y += dy * SQUARE_SIZE
+            # Check if the new position is not colliding with obstacles
+            if pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE) not in obstacles:
+                # Update the position
+                self.rect.x, self.rect.y = new_x, new_y
 
-        # Check for collisions with obstacles
-        for obstacle in obstacles:
-            if self.rect.colliderect(obstacle):
-                # If there is a collision, revert to the old position
-                self.rect.x, self.rect.y = old_x, old_y
-                return False
+                # Update the image based on the direction of movement
+                if dx > 0:
+                    self.image_index = 3  # Right
+                elif dx < 0:
+                    self.image_index = 2  # Left
+                elif dy > 0:
+                    self.image_index = 1  # Down
+                elif dy < 0:
+                    self.image_index = 0  # Up
 
-        # Change the player's image based on the direction
-        if dx > 0:
-            self.image_index = 3  # Right
-        elif dx < 0:
-            self.image_index = 2  # Left
-        elif dy > 0:
-            self.image_index = 1  # Down
-        elif dy < 0:
-            self.image_index = 0  # Up
-        self.image = self.images[self.image_index]  # Set the appropriate image
+                self.image = self.images[self.image_index]
+                self.last_move_time = current_time  # Update the last move time
+                return True
 
-        return True
+        return False
 
+    def random_move(self, obstacles):
+        current_time = time.time()
+        if current_time - self.last_move_time >= NPCs_MOVE_DELAY:  # Check if enough time has passed since the player's last movement
+            # Choose a random direction
+                                   # Right   #Left   #Down    #Up
+            dx, dy = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])  #(col, row)
+            new_x, new_y = self.rect.x + dx * SQUARE_SIZE, self.rect.y + dy * SQUARE_SIZE
 
-def draw_environment(screen, rock_image, tile_img, players, coordinates):
+            # Check if the new position is not colliding with obstacles
+            if pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE) not in obstacles:
+                # Update the position
+                self.rect.x, self.rect.y = new_x, new_y
+                self.last_move_time = current_time  # Update the last move time
+
+class Bullet:
+    def __init__(self, x, y, dx, dy, image):
+        self.rect = image.get_rect()
+        self.rect.center = (x, y)
+        self.dx = dx
+        self.dy = dy
+        self.image = image
+
+    def move(self):
+        self.rect.x += self.dx
+        self.rect.y += self.dy
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+def shoot(player, bullets, bullet_image):
+    # Determine bullet direction based on player direction
+    if player.image_index == 0:  # Up
+        dx, dy = 0, -1
+    elif player.image_index == 1:  # Down
+        dx, dy = 0, 1
+    elif player.image_index == 2:  # Left
+        dx, dy = -1, 0
+    elif player.image_index == 3:  # Right
+        dx, dy = 1, 0
+
+    # Create a bullet and add it to the bullets list
+    bullet = Bullet(player.rect.centerx, player.rect.centery, dx * 20, dy * 20, bullet_image)
+    bullets.append(bullet)
+
+def draw_environment(screen, box_img, tile_img, players, coordinates, bullets):
     # Draw the black squares and the gray lines of the environment
     for y in range(0, SCREEN_HEIGHT, SQUARE_SIZE):
         for x in range(0, SCREEN_WIDTH, SQUARE_SIZE):
@@ -69,7 +117,6 @@ def draw_environment(screen, rock_image, tile_img, players, coordinates):
         screen.blit(tile_img, (i * SQUARE_SIZE, 0))
         screen.blit(tile_img, (i * SQUARE_SIZE, SCREEN_HEIGHT - SQUARE_SIZE))
 
-    # Draw the inner squares
     for coord in coordinates:
         screen.blit(tile_img, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
 
@@ -77,11 +124,17 @@ def draw_environment(screen, rock_image, tile_img, players, coordinates):
     corner_coordinates = [(13, 1), (5, 9), (18, 5)]
 
     for coord in corner_coordinates:
-        screen.blit(rock_image, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
+        screen.blit(box_img, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
 
     # Draw players
     for player in players:
         player.draw(screen)
+
+    # Draw bullets
+    for bullet in bullets:
+        bullet.draw(screen)
+
+
 
 def main():
     pygame.init()
@@ -124,7 +177,8 @@ def main():
     player_images = []
 
     # Load images for each direction for each player
-    for i in range(1, 5):
+    for i in range(1, 6):
+
         images = []
         for j in range(1, 5):
             image_path = f"Images/Players/Player_{i}_{j}.png"
@@ -138,33 +192,55 @@ def main():
         Player(player_images[0], 5, 5, 0),
         Player(player_images[1], 13, 2, 2),
         Player(player_images[2], 2, 3, 1),
-        Player(player_images[3], 9, 7, 3)
+        Player(player_images[3], 9, 7, 3),
+        Player(player_images[4], 16, 8, 0)
     ]
 
     # Load images and resize them
-    rock_image = pygame.image.load("Images/Obstacles/Box.jpg")
-    rock_image = pygame.transform.scale(rock_image, (SQUARE_SIZE, SQUARE_SIZE))
+    box_img = pygame.image.load("Images/Obstacles/Box.jpg")
+    box_img = pygame.transform.scale(box_img, (SQUARE_SIZE, SQUARE_SIZE))
 
     tile_img = pygame.image.load("Images/Obstacles/Stone_Tile.jpg")  # Load the image
     tile_img = pygame.transform.scale(tile_img, (SQUARE_SIZE, SQUARE_SIZE))
+
+    # Load bullet image
+    bullet_image = pygame.image.load("Images/Obstacles/shoot.png")
+    bullet_image = pygame.transform.scale(bullet_image, (20, 20))  # Adjust size as needed
+
+    # List to store bullets
+    bullets = []
 
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    players[1].move(-1, 0, obstacle_rects)
-                elif event.key == pygame.K_RIGHT:
-                    players[1].move(1, 0, obstacle_rects)
-                elif event.key == pygame.K_UP:
-                    players[1].move(0, -1, obstacle_rects)
-                elif event.key == pygame.K_DOWN:
-                    players[1].move(0, 1, obstacle_rects)
 
-        screen.fill((255, 255, 255))  # Fill the screen with white
-        draw_environment(screen, rock_image, tile_img, players, coordinates)  # Draw the environment
+        # Control player 1 with arrow keys
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT]:
+            players[0].move(-1, 0, obstacle_rects)
+        elif keys[pygame.K_RIGHT]:
+            players[0].move(1, 0, obstacle_rects)
+        elif keys[pygame.K_UP]:
+            players[0].move(0, -1, obstacle_rects)
+        elif keys[pygame.K_DOWN]:
+            players[0].move(0, 1, obstacle_rects)
+
+        if keys[pygame.K_f]:
+            shoot(players[0], bullets, bullet_image)
+
+        # Move and draw bullets
+        for bullet in bullets:
+            bullet.move()
+            bullet.draw(screen)
+        # Random movement for AI-controlled players
+        for player in players[1:]:
+            player.random_move(obstacle_rects)
+
+        screen.fill((255, 255, 255))
+        draw_environment(screen, box_img, tile_img, players, coordinates, bullets)
+
 
         # Reset iterator if video ends
         frame = next(frame_iterator, None)
@@ -172,17 +248,13 @@ def main():
             frame_iterator = clip.iter_frames()
             frame = next(frame_iterator, None)
 
-        # Convert the frame to a Pygame surface
         frame_surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
-
-        # Resize the frame as the square size
         frame_surface = pygame.transform.scale(frame_surface, (SQUARE_SIZE, SQUARE_SIZE))
-
-        # Position of the fire video
         screen.blit(frame_surface, (10 * SQUARE_SIZE, 8 * SQUARE_SIZE))
 
-        pygame.display.flip()  # For update the entire screen
-        clock.tick(30)  # To regulate the speed of display frames
+        pygame.display.flip()
+        clock.tick(30)
+
     pygame.quit()
     sys.exit()
 
