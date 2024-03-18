@@ -3,6 +3,7 @@ import sys
 import random
 import time
 
+
 # Constants
 SQUARE_SIZE = 60
 SCREEN_WIDTH = SQUARE_SIZE * 21  # 21 squares
