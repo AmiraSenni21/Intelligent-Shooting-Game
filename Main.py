@@ -1,6 +1,5 @@
 import pygame
 import sys
-from moviepy.editor import VideoFileClip
 import random
 import time
 
@@ -71,6 +70,18 @@ class Player:
                     # Update the position
                     self.rect.x, self.rect.y = new_x, new_y
                     self.last_move_time = current_time  # Update the last move time
+
+                    # Update the image based on the direction of movement
+                    if dx > 0:
+                        self.image_index = 3  # Right
+                    elif dx < 0:
+                        self.image_index = 2  # Left
+                    elif dy > 0:
+                        self.image_index = 1  # Down
+                    elif dy < 0:
+                        self.image_index = 0  # Up
+
+                    self.image = self.images[self.image_index]
 
 
 
@@ -164,7 +175,7 @@ def draw_environment(screen, box_img, tile_img, players, coordinates, bullets):
         screen.blit(tile_img, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
 
     # Draw boxes
-    corner_coordinates = [(13, 1), (5, 9), (18, 5)]
+    corner_coordinates = [(13, 1), (5, 9), (18, 5), (10,8)]
 
     for coord in corner_coordinates:
         screen.blit(box_img, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
@@ -181,10 +192,6 @@ def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Intelligent Shooting Game")
-
-    clip = VideoFileClip("Images/Obstacles/Fire.mp4")
-    frame_iterator = clip.iter_frames()  # Get iterator for video frames
-    clock = pygame.time.Clock()
 
     # Define list of coordinates of the stone tiles
     coordinates = [(3, 2), (3, 3), (3, 4), (2, 4), (1, 6), (2, 6), (3, 6), (5, 6), (5, 7), (5, 8), (3, 9), (4, 9),
@@ -288,20 +295,7 @@ def main():
 
         screen.fill((255, 255, 255))
         draw_environment(screen, box_img, tile_img, players, coordinates, bullets)
-
-
-        # Reset iterator if video ends
-        frame = next(frame_iterator, None)
-        if frame is None:
-            frame_iterator = clip.iter_frames()
-            frame = next(frame_iterator, None)
-
-        frame_surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
-        frame_surface = pygame.transform.scale(frame_surface, (SQUARE_SIZE, SQUARE_SIZE))
-        screen.blit(frame_surface, (10 * SQUARE_SIZE, 8 * SQUARE_SIZE))
-
         pygame.display.flip()
-        clock.tick(30)
 
     pygame.quit()
     sys.exit()
