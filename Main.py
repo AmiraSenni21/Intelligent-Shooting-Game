@@ -19,13 +19,15 @@ Bullet_Time = 0.3  # Time between shots (in seconds)
 class Player:
     def __init__(self, images, x, y, initial_image_index):
         self.images = images
-        self.image = self.images[initial_image_index]
+        self.image_index = initial_image_index
+        self.image = self.images[self.image_index]  # Initial image
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x * SQUARE_SIZE, y * SQUARE_SIZE)  # Intial position of the player
-        self.last_move_time = time.time()  # tracking the time of the last movement.
-        self.last_shot_time = time.time()  # tracking the time of the last shot.
+        self.rect.topleft = (x * SQUARE_SIZE, y * SQUARE_SIZE)
+        self.last_move_time = time.time()
+        self.last_shot_time = time.time()
+        self.shooting = False
 
-    #Draw the player's image onto the game screen
+        # Draw the player's image onto the game screen
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
@@ -55,27 +57,32 @@ class Player:
                 return True
         return False
 
-    def random_move(self, obstacles):
-        current_time = time.time()
-        if current_time - self.last_move_time >= NPCs_MOVE_DELAY:  # Check if enough time has passed since the player's last movement
-            # Choose a random direction
-                                   # Right   #Left   #Down    #Up
-            dx, dy = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])  #(col, row)
-            new_x, new_y = self.rect.x + dx * SQUARE_SIZE, self.rect.y + dy * SQUARE_SIZE
+    rand_move = True
+    def random_move(self, obstacles, rand_move):
+        if(rand_move) :
+            current_time = time.time()
+            if current_time - self.last_move_time >= NPCs_MOVE_DELAY:  # Check if enough time has passed since the player's last movement
+                # Choose a random direction
+                                       # Right   #Left   #Down    #Up
+                dx, dy = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])  #(col, row)
+                new_x, new_y = self.rect.x + dx * SQUARE_SIZE, self.rect.y + dy * SQUARE_SIZE
 
-            # Check if the new position is not colliding with obstacles
-            if pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE) not in obstacles:
-                # Update the position
-                self.rect.x, self.rect.y = new_x, new_y
-                self.last_move_time = current_time  # Update the last move time
+                # Check if the new position is not colliding with obstacles
+                if pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE) not in obstacles:
+                    # Update the position
+                    self.rect.x, self.rect.y = new_x, new_y
+                    self.last_move_time = current_time  # Update the last move time
+
+
+
 
     # Check if the player can shoot
     def can_shoot(self):
         current_time = time.time()
         return current_time - self.last_shot_time >= Bullet_Time
 
-   # To get the shooting time
-    def shoot(self):
+    # To get the shooting time
+    def last_shoot(self):
         self.last_shot_time = time.time()
 
 class Bullet:
@@ -108,7 +115,33 @@ def shoot(player, bullets, bullet_image):
         # Create a bullet and add it to the bullets list
         bullet = Bullet(player.rect.centerx, player.rect.centery, dx * 25, dy * 25, bullet_image)
         bullets.append(bullet)  # This list is used to keep track of all the bullets currently active in the game.
-        player.shoot()
+        player.last_shoot()
+
+def get_shooting_player(players):
+    for player in players:
+        if player.shooting:
+            players.remove(player)
+    return None  # Return None if no player is shooting
+
+def check_bullet_collision(bullets, players, obstacle_rects):
+    # Iterate through bullets
+    for bullet in bullets[:]:
+        # Check collision with players
+        for player in players[1:]:
+            if bullet.rect.colliderect(player.rect):
+                # Remove bullet if it hits a player
+                bullets.remove(bullet)
+                #player.change_image("Images/Players/Blood.png")
+                player.shooting = True
+                get_shooting_player(players)
+                break  # Break out of the inner loop to avoid checking other players
+
+        # Check collision with obstacles
+        for obstacle_rect in obstacle_rects:
+            if bullet.rect.colliderect(obstacle_rect):
+                # Remove bullet if it hits an obstacle
+                bullets.remove(bullet)
+                break  # Break out of the inner loop to avoid unnecessary checks
 
 def draw_environment(screen, box_img, tile_img, players, coordinates, bullets):
     # Draw the black squares and the gray lines of the environment
@@ -236,16 +269,23 @@ def main():
         elif keys[pygame.K_DOWN]:
             players[0].move(0, 1, obstacle_rects)
 
+
+        # Random movement for NPCs players
+        for player in players[1:]:
+            player.random_move(obstacle_rects, True)
+
+        # If user press F key
         if keys[pygame.K_f]:
             shoot(players[0], bullets, bullet_image)
+
+
+        # Check bullet collision with players and obstacles
+        check_bullet_collision(bullets, players, obstacle_rects)
 
         # Move and draw bullets
         for bullet in bullets:
             bullet.move()
             bullet.draw(screen)
-        # Random movement for NPCs players
-        for player in players[1:]:
-            player.random_move(obstacle_rects)
 
         screen.fill((255, 255, 255))
         draw_environment(screen, box_img, tile_img, players, coordinates, bullets)
