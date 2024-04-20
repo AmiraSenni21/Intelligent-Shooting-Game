@@ -36,6 +36,8 @@ obstacle_rects = [pygame.Rect(coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE, SQ
                       for coord in Obstacles]
 num_input_features = len(Obstacles) * 4
 Neural_angle = 0
+
+
 class NeuralNetwork:
     def __init__(self, num_input_features):
         # Initialize weights and biases for:
