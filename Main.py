@@ -3,7 +3,7 @@ import sys
 import random
 import time
 import math
-
+import numpy as np
 
 # Constants
 SQUARE_SIZE = 60
@@ -12,8 +12,8 @@ SCREEN_HEIGHT = SQUARE_SIZE * 12  # 12 squares
 LINE_WIDTH = 2
 GRAY = (150, 150, 150)
 BLACK = (0, 0, 0)
-NPCs_MOVE_DELAY = 0.5  # Speed of NPCs
-PLAYER_MOVE_DELAY = 0.5  # The speed of player movement
+NPCs_MOVE_DELAY = 0.4  # Speed of NPCs
+PLAYER_MOVE_DELAY = 0.4  # The speed of player movement
 Bullet_Time = 0.3  # Time between shots (in seconds)
 ANGLE_OF_VIEW = 120  # in degrees
 NUM_SENSORS = 6
@@ -34,10 +34,78 @@ Obstacles = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0,
              (17, 9), (18, 9), (17, 8), (18, 10)]
 obstacle_rects = [pygame.Rect(coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
                       for coord in Obstacles]
+num_input_features = len(Obstacles) * 4
+Neural_angle = 0
+class NeuralNetwork:
+    def __init__(self, num_input_features):
+        # Initialize weights and biases for:
+        # first hidden layer have 4 neurons
+        self.weights1 = np.random.randn(num_input_features, 4)
+        self.bias1 = np.random.randn(4)
+
+        # second hidden layer have 5 neurons
+        self.weights2 = np.random.randn(4, 5)
+        self.bias2 = np.random.randn(5)
+
+        # third hidden layer have 4 neurons
+        self.weights3 = np.random.randn(5, 4)
+        self.bias3 = np.random.randn(4)
+
+        # angle output
+        self.weights_angle = np.random.randn(4)
+        self.bias_angle = np.random.randn()
+
+        # direction output
+        self.weights_direction = np.random.randn(4)
+        self.bias_direction = np.random.randn()
+
+        # shoot output
+        self.weights_shoot = np.random.randn(4)
+        self.bias_shoot = np.random.randn()
+
+    # sigmoid function outputs values between 0 and 1.
+    def sigmoid(self, x):
+        x = np.clip(x, -500, 500)
+        return 1 / (1 + np.exp(-x))
+
+    def predict(self, obstacles, friends, enemies):
+        # Convert each input list into numpy array
+        obstacles = np.array(obstacles)
+        friends = np.array(friends)
+        enemies = np.array(enemies)
+
+        # Flatten and concatenate the arrays
+        inputs = np.concatenate((obstacles.flatten(), friends.flatten(), enemies.flatten()))
+
+        # Calculate weighted sum of inputs and add bias for each neuron in first hidden layer
+        layer1_outputs = self.sigmoid(np.dot(inputs, self.weights1) + self.bias1)
+
+        # Calculate weighted sum of first hidden layer outputs and add bias for each neuron in second hidden layer
+        layer2_outputs = self.sigmoid(np.dot(layer1_outputs, self.weights2) + self.bias2)
+
+        # Calculate weighted sum of second hidden layer outputs and add bias for each neuron in third hidden layer
+        layer3_outputs = self.sigmoid(np.dot(layer2_outputs, self.weights3) + self.bias3)
+
+        # Calculate weighted sum of third hidden layer outputs and add bias for each action
+        output_angle = self.sigmoid(np.dot(layer3_outputs, self.weights_angle) + self.bias_angle)
+        output_direction = self.sigmoid(np.dot(layer3_outputs, self.weights_direction) + self.bias_direction)
+        output_shoot = self.sigmoid(np.dot(layer3_outputs, self.weights_shoot) + self.bias_shoot)
+
+        # Convert output to game actions
+        angles = [-60, -36, -12, 0, 12, 36, 60]
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+        angle = angles[int(output_angle * len(angles))]  # Convert to one of the angles
+        direction = directions[int(output_direction * len(directions))]  # Convert to one of the directions
+        shoot = round(output_shoot)  # Round to nearest integer (0 or 1)
+
+        return angle, direction, shoot
+
 
 
 class Player:
-    def __init__(self, images, x, y, initial_image_index):
+    def __init__(self, images, x, y, initial_image_index, team):
+        self.network = NeuralNetwork(num_input_features)
         self.images = images
         self.image_index = initial_image_index
         self.image = self.images[self.image_index]  # Initial image
@@ -50,6 +118,7 @@ class Player:
         self.x = x
         self.y = y
         self.last_rotation_time = time.time()
+        self.team = team
 
         # Sensor properties
         self.angle = 0  # Initialize angle
@@ -79,6 +148,8 @@ class Player:
                         closest_collision_distance = distance
                         closest_collision_type = 'obstacle'
 
+
+
             # Check for player collision
             for player in players:
                 if player != self:  # Avoid checking collision with self
@@ -94,7 +165,6 @@ class Player:
                         # Only allow shooting if the closest collision is with a player
                         if closest_collision_type == 'player':
                             angle_image = 0
-
                             if self.sensor_angles[i] == -60:
                                 angle_image = 60
                             elif self.sensor_angles[i] == -36:
@@ -108,11 +178,13 @@ class Player:
                             else:
                                 print("No case !")
 
-                            center = self.rect.center
-                            self.image = pygame.transform.rotate(self.images[self.image_index], angle_image)
-                            self.rect = self.image.get_rect()
-                            self.rect.center = center
-                            shoot(self, bullets, bullet_image, -angle_image)
+                            if player.team != self.team:
+                                center = self.rect.center
+                                self.image = pygame.transform.rotate(self.images[self.image_index], Neural_angle)
+                                self.rect = self.image.get_rect()
+                                self.rect.center = center
+                                # print("Shoooot")
+                                # shoot(self, bullets, bullet_image, player.x, player.y,-Neural_angle)
 
             # Update sensor length
             self.sensors[i] = closest_collision_distance
@@ -149,15 +221,17 @@ class Player:
             # Draw player image
             screen.blit(self.image, self.collision_rect)
 
-
     def move(self, dx, dy, obstacles):
         current_time = time.time()
         if current_time - self.last_move_time >= PLAYER_MOVE_DELAY:
             # Calculate the new position
             new_x, new_y = self.collision_rect.x + dx * SQUARE_SIZE, self.collision_rect.y + dy * SQUARE_SIZE
 
+            # Create a temporary rectangle for the new position
+            new_rect = pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE)
+
             # Check if the new position is not colliding with obstacles
-            if pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE) not in obstacles:
+            if not any(new_rect.colliderect(obstacle) for obstacle in obstacle_rects):
                 # Update the position
                 self.collision_rect.x, self.collision_rect.y = new_x, new_y
                 self.rect.center = self.collision_rect.center  # Keep the image centered on the collision rectangle
@@ -178,13 +252,6 @@ class Player:
                 if dx != 0 or dy != 0:
                     self.angle = math.degrees(math.atan2(dy, dx))
 
-    def random_move(self, obstacles):
-        current_time = time.time()
-        if current_time - self.last_move_time >= NPCs_MOVE_DELAY:
-            # Choose a random direction
-            dx, dy = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
-            self.move(dx, dy, obstacles)
-
     def can_shoot(self):
         current_time = time.time()
         return current_time - self.last_shot_time >= Bullet_Time
@@ -202,6 +269,12 @@ class Bullet:
         rad = math.radians(angle)
         self.dx = dx * math.cos(rad) - dy * math.sin(rad)
         self.dy = dx * math.sin(rad) + dy * math.cos(rad)
+
+        # Reduce speed of bullet
+        speed_factor = 1.5  # Adjust this value to change the speed
+        self.dx *= speed_factor
+        self.dy *= speed_factor
+
         self.image = image
 
     def move(self):
@@ -212,7 +285,7 @@ class Bullet:
         screen.blit(self.image, self.rect)
 
 
-def shoot(player, bullets, bullet_image, angle):
+def shoot(player, bullets, bullet_image, dx, dy, angle):
     if player.can_shoot():
         # Determine bullet direction based on player direction
         if player.image_index == 0:  # Up
@@ -225,7 +298,7 @@ def shoot(player, bullets, bullet_image, angle):
             dx, dy = 1, 0
 
         # Create a bullet and add it to the bullets list
-        bullet = Bullet(player.rect.centerx, player.rect.centery, dx * 30, dy * 30, bullet_image, angle)
+        bullet = Bullet(player.rect.centerx, player.rect.centery, dx * 25, dy * 25, bullet_image, angle)
         bullets.append(bullet)  # This list is used to keep track of all the bullets currently active in the game.
         player.last_shoot()
 
@@ -247,15 +320,15 @@ def check_bullet_collision(bullets, players, obstacle_rects):
                 bullets.remove(bullet)
                 # player.change_image("Images/Players/Blood.png")
                 player.shooting = True
-                get_shooting_player(players)
-                break  
+                # get_shooting_player(players)
+                break
 
         # Check collision with obstacles
         for obstacle_rect in obstacle_rects:
             if bullet.rect.colliderect(obstacle_rect):
                 # Remove bullet if it hits an obstacle
                 bullets.remove(bullet)
-                break 
+                break
 
 
 def draw_environment(screen, box_img, tile_img, players, Obstacles, bullets):
@@ -293,6 +366,7 @@ def draw_environment(screen, box_img, tile_img, players, Obstacles, bullets):
         bullet.draw(screen)
 
 
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -300,6 +374,11 @@ def main():
 
     # Load player images
     player_images = []
+    Team_1 = []
+    Team_2 = []
+
+    friends = []
+    enemies = []
 
     # Load images for each direction for each player
     for i in range(1, 6):  # 5 players
@@ -314,12 +393,13 @@ def main():
 
     # Create player objects with fixed positions
     players = [
-        Player(player_images[0], 5, 5, 3),
-        Player(player_images[1], 13, 2, 2),
-        Player(player_images[2], 2, 3, 1),
-        Player(player_images[3], 9, 7, 3),
-        Player(player_images[4], 16, 8, 0)
+        Player(player_images[0], 5, 5, 3, 1),
+        Player(player_images[1], 8, 2, 2, 2),
+        Player(player_images[2], 2, 3, 1, 1),
+        Player(player_images[3], 9, 7, 3, 2),
+        Player(player_images[4], 16, 8, 0, 1)
     ]
+
 
     # Load images and resize them
     box_img = pygame.image.load("Images/Obstacles/Box.jpg")
@@ -336,27 +416,28 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        # Control player 1 with arrow keys
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT]:
-            players[0].move(-1, 0, obstacle_rects)
-        elif keys[pygame.K_RIGHT]:
-            players[0].move(1, 0, obstacle_rects)
-        elif keys[pygame.K_UP]:
-            players[0].move(0, -1, obstacle_rects)
-        elif keys[pygame.K_DOWN]:
-            players[0].move(0, 1, obstacle_rects)
+        for player in players:
+            if player.team == 1:
+                friends = [p.rect.center for p in Team_1 if p != player]  # Extract positions of friendly players
+                enemies = [p.rect.center for p in Team_2]  # Extract positions of enemy players
+            elif player.team == 2:
+                friends = [p.rect.center for p in Team_2 if p != player]  # Extract positions of friendly players
+                enemies = [p.rect.center for p in Team_1]  # Extract positions of enemy players
 
-        # # If user press F key
-        # if keys[pygame.K_f]:
-        #     shoot(players[0], bullets, bullet_image, 0)
+                # Use the network to predict the game actions
+                angle, direction, shooting = player.network.predict(obstacle_rects, friends, enemies)
 
-        # Random movement for NPCs players
-        for player in players[1:]:
-            player.random_move(obstacle_rects)
+                # Update player's direction continuously
+                player.x = direction[0]
+                player.y = direction[1]
+                player.move(player.x, player.y, Obstacles)
+                Neural_angle = angle
+
+                # Check if the neural network predicts shooting
+                if shooting == 1:
+                    shoot(player, bullets, bullet_image, player.x, player.y, -Neural_angle)
 
 
-        # Check bullet collision with players and obstacles
         check_bullet_collision(bullets, players, obstacle_rects)
 
         # Move and draw bullets
@@ -374,3 +455,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
