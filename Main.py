@@ -6,9 +6,9 @@ import math
 import numpy as np
 
 # Constants
-SQUARE_SIZE = 60
-SCREEN_WIDTH = SQUARE_SIZE * 21  # 21 squares
-SCREEN_HEIGHT = SQUARE_SIZE * 12  # 12 squares
+SQUARE_SIZE = 40
+SCREEN_WIDTH = SQUARE_SIZE * 30  # 30 squares
+SCREEN_HEIGHT = SQUARE_SIZE * 15  # 15 squares
 LINE_WIDTH = 2
 GRAY = (150, 150, 150)
 BLACK = (0, 0, 0)
@@ -20,24 +20,31 @@ NUM_SENSORS = 6
 bullets = []
 bullet_image = pygame.image.load("Images/Obstacles/Bullet.png")
 bullet_image = pygame.transform.scale(bullet_image, (10, 10))
-Obstacles = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9),
-             (0, 10), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0), (8, 0), (9, 0),
-             (10, 0), (11, 0), (12, 0), (13, 0), (14, 0), (15, 0), (16, 0), (17, 0), (18, 0),
-             (19, 0), (20, 0), (20, 0), (20, 1), (20, 2), (20, 3), (20, 4), (20, 5), (20, 6),
-             (20, 7), (20, 8), (20, 9), (20, 10), (1, 11), (2, 11), (3, 11), (4, 11), (5, 11),
-             (6, 11), (7, 11), (8, 11), (9, 11), (10, 11), (11, 11), (12, 11), (13, 11), (14, 11),
-             (15, 11), (16, 11), (17, 11), (18, 11), (19, 11), (20, 11), (13, 1), (5, 9), (18, 5),
-             (10, 8), (3, 2), (3, 3), (3, 4), (2, 4), (1, 6), (2, 6), (3, 6), (5, 6), (5, 7), (5, 8),
-             (3, 9), (4, 9), (5, 9), (10, 1), (10, 2), (10, 3), (10, 4), (10, 5), (9, 5), (8, 5), (11, 5),
-             (12, 5), (13, 5), (12, 3), (13, 3), (14, 3), (13, 1), (17, 2), (18, 2), (17, 5), (18, 5),
-             (18, 6), (19, 6), (10, 7), (10, 9), (9, 8), (11, 8), (15, 7), (15, 8), (15, 9), (16, 9),
-             (17, 9), (18, 9), (17, 8), (18, 10)]
+
+Obstacles = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0, 10),
+             (0, 11), (0, 12), (0, 13), (0, 14), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0),
+             (8, 0), (9, 0), (10, 0), (11, 0), (12, 0), (13, 0), (14, 0), (15, 0), (16, 0), (17, 0),
+             (18, 0), (19, 0), (20, 0), (21, 0), (22, 0), (23, 0), (24, 0), (25, 0), (26, 0), (27, 0),
+             (28, 0),(29, 0), (29, 1), (29, 2), (29, 3), (29, 4), (29, 5), (29, 6), (29, 7), (29, 8), (29, 9),
+             (29, 10),(29, 11), (29, 12), (29, 13), (29, 14), (0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5),
+             (0, 6), (0, 7), (0, 8), (0, 9), (0, 10),(0, 11), (0, 12), (0, 13), (0, 14), (1, 14), (2, 14),
+             (3, 14), (4, 14), (5, 14), (6, 14), (7, 14),(8, 14), (9, 14), (10, 14), (11, 14), (12, 14),
+             (13, 14), (14, 14), (15, 14), (16, 14), (17, 14),(18, 14), (19, 14), (20, 14), (21, 14), (22, 14),
+             (23, 14), (24, 14), (25, 14), (26, 14), (27, 14),(28, 14),(29, 14),
+             (13, 1), (5, 9),(18, 5), (10, 8),(5, 2), (5, 3),(5, 4), (4, 4), (1, 6),(2, 6),(3, 6),(8, 6),
+             (8, 7), (8, 8), (3, 10), (4, 10), (5, 10),(10, 1), (10, 2),(10, 3),(10, 4),(10, 5), (9, 5), (8, 5),
+             (11, 5), (12, 5), (13, 5),(12, 3), (13, 3),(14, 3), (13, 1),(17, 2), (18, 2), (17, 5), (18, 5),
+             (18, 6),(19, 6),(10, 7),(10, 9), (9, 8), (11, 8),(15, 7), (15, 8),(15, 9), (16, 9), (17, 9),
+             (18, 9),(17, 8),(18, 10), (23, 7), (24, 7), (25, 7), (26, 7), (23, 8), (23, 9), (23, 10), (23, 11), (23, 12)]
+
 obstacle_rects = [pygame.Rect(coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
                       for coord in Obstacles]
 num_input_features = len(Obstacles) * 2
 Neural_angle = 0
 friends = []
 enemies = []
+All_Bulltes = []
+
 class NeuralNetwork:
     def __init__(self, num_input_features):
         # Initialize weights and biases for:
@@ -116,7 +123,7 @@ class Player:
         self.rect.topleft = (x * SQUARE_SIZE, y * SQUARE_SIZE)
         self.last_move_time = time.time()
         self.last_shot_time = time.time()
-        self.shooting = False
+        self.injured = False
         self.x = x
         self.y = y
         self.last_rotation_time = time.time()
@@ -132,6 +139,16 @@ class Player:
 
         # Create a separate rectangle for collision detection
         self.collision_rect = pygame.Rect(self.rect.left, self.rect.top, SQUARE_SIZE, SQUARE_SIZE)
+
+    def handle_collision(self, players, All_Bulltes):
+        for player in players:
+            for bullet in All_Bulltes:
+                if bullet.rect.colliderect(player.rect):
+                    # Check if the bullet belongs to the enemy team
+                    if bullet.owner != player:
+                        if player in players:
+                             players.remove(player)
+                           # player.image_index = 4  # Change the image index of the hit player
 
     def update_sensors(self, obstacles, players):
         for i, angle in enumerate(self.sensor_angles):
@@ -198,30 +215,30 @@ class Player:
                 self.sensor_color = (255, 255, 0)  # Yellow if no intersection
 
 
-    def draw(self, screen, obstacles, players):
-        obstacle_rects = [pygame.Rect(coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)for coord in obstacles]
-        self.update_sensors(obstacle_rects, players)
-        for i, angle in enumerate(self.sensor_angles):
-            sensor_length = self.sensors[i]
-            sensor_direction = pygame.Vector2(1, 0).rotate(self.angle + angle)
-            end_point = self.collision_rect.center + sensor_direction * sensor_length
+    def draw(self, screen, obstacle_rects, players):
+        if self.image_index != 4:  # Skip drawing if the image_index is 4
+            self.update_sensors(obstacle_rects, players)
+            for i, angle in enumerate(self.sensor_angles):
+                sensor_length = self.sensors[i]
+                sensor_direction = pygame.Vector2(1, 0).rotate(self.angle + angle)
+                end_point = self.collision_rect.center + sensor_direction * sensor_length
 
-            # Determine color based on sensor length and player-player collision
-            if sensor_length < self.sensor_range or sensor_length == 0:
-                sensor_color = (255, 0, 0)  # Red if collision occurs
-            # elif self.sensor_angles[i] > 0:
-            #     sensor_color = (0, 255, 0) # Green if no collision
-            else:
-                sensor_color = (255, 255, 0)  # Yellow if no collision
+                # Determine color based on sensor length and player-player collision
+                if sensor_length < self.sensor_range or sensor_length == 0:
+                    sensor_color = (255, 0, 0)  # Red if collision occurs
+                # elif self.sensor_angles[i] > 0:
+                #     sensor_color = (0, 255, 0) # Green if no collision
+                else:
+                    sensor_color = (255, 255, 0)  # Yellow if no collision
 
-            # Draw sensor line
-            pygame.draw.line(screen, sensor_color, self.collision_rect.center, end_point, 2)
+                # Draw sensor line
+                pygame.draw.line(screen, sensor_color, self.collision_rect.center, end_point, 2)
 
-            # Draw green boxes around the player
-            pygame.draw.rect(screen, (0, 255, 0), self.collision_rect, 2)
+                # Draw green boxes around the player
+                pygame.draw.rect(screen, (0, 255, 0), self.collision_rect, 2)
 
-            # Draw player image
-            screen.blit(self.image, self.collision_rect)
+                # Draw player image
+                screen.blit(self.image, self.collision_rect)
 
     def move(self, dx, dy, obstacles):
         current_time = time.time()
@@ -254,9 +271,6 @@ class Player:
                 # Update the player's angle
                 if dx != 0 or dy != 0:
                     self.angle = math.degrees(math.atan2(dy, dx))
-            else:
-                print("There is  a collision.")
-
 
 
     def can_shoot(self):
@@ -268,9 +282,10 @@ class Player:
 
 
 class Bullet:
-    def __init__(self, x, y, dx, dy, image, angle):
+    def __init__(self, player, x, y, dx, dy, image, angle):
         self.rect = image.get_rect()
         self.rect.center = (x, y)
+        self.owner = player
 
         # Convert angle to radians and rotate dx and dy
         rad = math.radians(angle)
@@ -294,39 +309,24 @@ class Bullet:
 def shoot(player, bullets, bullet_image, angle):
     if player.can_shoot():
         # Determine bullet direction based on player direction
-        if player.image_index == 0:  # Up
-            dx, dy = 0, -1
-        elif player.image_index == 1:  # Down
-            dx, dy = 0, 1
-        elif player.image_index == 2:  # Left
-            dx, dy = -1, 0
-        elif player.image_index == 3:  # Right
-            dx, dy = 1, 0
+        if player.image_index != 4:  # died
+            if player.image_index == 0:  # Up
+                dx, dy = 0, -1
+            elif player.image_index == 1:  # Down
+                dx, dy = 0, 1
+            elif player.image_index == 2:  # Left
+                dx, dy = -1, 0
+            elif player.image_index == 3:  # Right
+                dx, dy = 1, 0
 
-        # Create a bullet and add it to the bullets list
-        bullet = Bullet(player.rect.centerx, player.rect.centery, dx * 25, dy * 25, bullet_image, angle)
-        bullets.append(bullet)  # This list is used to keep track of all the bullets currently active in the game.
-        player.last_shoot()
+            # Create a bullet and add it to the bullets list
+            bullet = Bullet(player, player.rect.centerx, player.rect.centery, dx * 25, dy * 25, bullet_image, angle)
+            bullets.append(bullet)  # This list is used to keep track of all the bullets currently active in the game.
+            player.last_shoot()
 
-def get_shooting_player(players):
-    for player in players:
-        if player.shooting:
-            players.remove(player)
-    return None  # Return None if no player is shooting
-
-def check_bullet_collision(bullets, players, obstacle_rects):
+def check_bullet_collision(bullets, obstacle_rects):
     # Iterate through bullets
     for bullet in bullets[:]:
-        # Check collision with players
-        for player in players[1:]:
-            if bullet.rect.colliderect(player.rect):
-                # Remove bullet if it hits a player
-                bullets.remove(bullet)
-                #player.change_image("Images/Players/Blood.png")
-                player.shooting = True
-                get_shooting_player(players)
-                break  # Break out of the inner loop to avoid checking other players
-
         # Check collision with obstacles
         for obstacle_rect in obstacle_rects:
             if bullet.rect.colliderect(obstacle_rect):
@@ -345,25 +345,18 @@ def draw_environment(screen, box_img, tile_img, players, Obstacles, bullets):
     for y in range(0, SCREEN_HEIGHT, SQUARE_SIZE):
         pygame.draw.line(screen, GRAY, (0, y), (SCREEN_WIDTH, y), LINE_WIDTH)
 
-    # Draw The borders
-    for i in range(0, SCREEN_HEIGHT // SQUARE_SIZE):
-        screen.blit(tile_img, (0, i * SQUARE_SIZE))
-        screen.blit(tile_img, (SCREEN_WIDTH - SQUARE_SIZE, i * SQUARE_SIZE))
-    for i in range(0, SCREEN_WIDTH // SQUARE_SIZE):
-        screen.blit(tile_img, (i * SQUARE_SIZE, 0))
-        screen.blit(tile_img, (i * SQUARE_SIZE, SCREEN_HEIGHT - SQUARE_SIZE))
 
     for coord in Obstacles:
         screen.blit(tile_img, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
 
     # Draw Boxes
-    boxes_coordinates = [(13, 1), (5, 9), (18, 5), (10, 8)]
+    boxes_coordinates = [(13, 1), (5, 9), (18, 5), (10, 8), (26, 6), (26, 5), (26, 4)]
     for coord in boxes_coordinates:
         screen.blit(box_img, (coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE))
 
     # Draw players
     for player in players:
-        player.draw(screen, Obstacles, players)
+        player.draw(screen, obstacle_rects, players)
 
     # Draw bullets
     for bullet in bullets:
@@ -382,21 +375,38 @@ def main():
 
     # Load images for each direction for each player
     for i in range(1, 6):  # 5 players
-        images = []
-        for j in range(1, 5): # 4 positions
-            image_path = f"Images/Players/Player_{i}_{j}.png"
+        images_1 = []
+        for j in range(1, 6): # 4 positions
+            image_path = f"Images/Players/Player_1_{j}.png"
             image = pygame.image.load(image_path)
-            image = pygame.transform.scale(image, (50, 50))  # Resize to 50x50
-            images.append(image)
-        player_images.append(images)
+            image = pygame.transform.scale(image, (40, 40))  # Resize to 50x50
+            images_1.append(image)
+        player_images.append(images_1)
+
+    for i in range(1, 6):  # 5 players
+        images_2 = []
+        for j in range(1, 6):  # 4 positions
+            image_path = f"Images/Players/Player_5_{j}.png"
+            image = pygame.image.load(image_path)
+            image = pygame.transform.scale(image, (40, 40))  # Resize to 50x50
+            images_2.append(image)
+        player_images.append(images_2)
 
     # Create player objects with fixed positions
     players = [
-        Player(player_images[0], 5, 5, 3, 1),
-        Player(player_images[1], 8, 2, 2, 2),
-        Player(player_images[2], 2, 3, 1, 1),
-        Player(player_images[3], 9, 7, 3, 2),
-        Player(player_images[4], 16, 8, 0, 1)
+        #Team 1
+        Player(player_images[0], 6, 4, 3, 1),
+        Player(player_images[1], 8, 2, 3, 1),
+        Player(player_images[2], 1, 3, 3, 1),
+        Player(player_images[3], 3, 12, 3, 1),
+        Player(player_images[4], 8, 13, 3, 1),
+
+        #Team 2
+        Player(player_images[5], 27, 7, 2, 2),
+        Player(player_images[6], 23, 2, 2, 2),
+        Player(player_images[7], 20, 13, 2, 2),
+        Player(player_images[8], 24, 3, 2, 2),
+        Player(player_images[9], 25, 10, 2, 2)
     ]
 
     # Load images and resize them
@@ -411,7 +421,6 @@ def main():
 
     # Make sure the number of input features matches the length of the flattened array
     num_input_features = len(obstacle_inputs)
-
     running = True
     while running:
         for event in pygame.event.get():
@@ -434,28 +443,31 @@ def main():
             player.move(dx, dy, Obstacles)
             Neural_angle = angle
 
-            print("Player = ", player)
-            print("Direction_0 = ", direction[0])
-            print("Direction_1 = ", direction[1])
-            print("Shooting = ", shooting)
+            # print("Player = ", player)
+            # print("Direction_0 = ", direction[0])
+            # print("Direction_1 = ", direction[1])
+            # print("Shooting = ", shooting)
 
             # Check if the neural network predicts shooting
             if shooting == 1:
                 # print("Shoot!!")
                 shoot(player, bullets, bullet_image, -Neural_angle)
-                # check_bullet_collision(bullets, players, obstacle_rects)
+                check_bullet_collision(bullets, obstacle_rects)
+                player.handle_collision(players, All_Bulltes)
 
+
+            # Update player's image rotation
             center = player.rect.center
             player.image = pygame.transform.rotate(player.images[player.image_index], Neural_angle)
             player.rect = player.image.get_rect()
             player.rect.center = center
 
 
-
         # Move and draw bullets
         for bullet in bullets:
             bullet.move()
             bullet.draw(screen)
+            All_Bulltes.append(bullet)
 
         screen.fill((255, 255, 255))
         draw_environment(screen, box_img, tile_img, players, Obstacles, bullets)
@@ -466,6 +478,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
+  
