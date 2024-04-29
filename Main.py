@@ -20,7 +20,6 @@ NUM_SENSORS = 6
 bullets = []
 bullet_image = pygame.image.load("Images/Obstacles/Bullet.png")
 bullet_image = pygame.transform.scale(bullet_image, (10, 10))
-
 Obstacles = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0, 10),
              (0, 11), (0, 12), (0, 13), (0, 14), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0),
              (8, 0), (9, 0), (10, 0), (11, 0), (12, 0), (13, 0), (14, 0), (15, 0), (16, 0), (17, 0),
@@ -36,7 +35,7 @@ Obstacles = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0,
              (11, 5), (12, 5), (13, 5),(12, 3), (13, 3),(14, 3), (13, 1),(17, 2), (18, 2), (17, 5), (18, 5),
              (18, 6),(19, 6),(10, 7),(10, 9), (9, 8), (11, 8),(15, 7), (15, 8),(15, 9), (16, 9), (17, 9),
              (18, 9),(17, 8),(18, 10), (23, 7), (24, 7), (25, 7), (26, 7), (23, 8), (23, 9), (23, 10), (23, 11), (23, 12)]
-
+obstacle_inputs = np.array(Obstacles).flatten()  # Flatten the obstacles into a 1D array
 obstacle_rects = [pygame.Rect(coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
                       for coord in Obstacles]
 num_input_features = len(Obstacles) * 2
@@ -44,7 +43,14 @@ Neural_angle = 0
 friends = []
 enemies = []
 All_Bulltes = []
-
+player_images = []   # Load player images
+Players = []
+Team_1 = []
+Team_2 = []
+Population =[]
+fitness_scores = []
+l=0
+parents = []
 class NeuralNetwork:
     def __init__(self, num_input_features):
         # Initialize weights and biases for:
@@ -72,6 +78,13 @@ class NeuralNetwork:
         self.weights_shoot = np.random.randn(4)
         self.bias_shoot = np.random.randn()
 
+        individual = (self.weights1, self.bias1, self.weights2, self.bias2,
+                      self.weights3, self.bias3, self.weights_angle, self.bias_angle,
+                      self.weights_direction, self.bias_direction, self.weights_shoot,
+                      self.bias_shoot
+        )
+        Population.append(individual)
+
     # sigmoid function outputs values between 0 and 1.
     def sigmoid(self, x):
         x = np.clip(x, -500, 500)
@@ -84,7 +97,7 @@ class NeuralNetwork:
         enemies = np.array(enemies)
 
         # Flatten and concatenate the arrays
-        inputs = np.concatenate((obstacles.flatten(), friends.flatten(), enemies.flatten()))
+        inputs = np.concatenate((obstacles.flatten(), friends.flatten(), enemies.flatten())) #conbert all inputs in one 1D inpur
 
         # Calculate weighted sum of inputs and add bias for each neuron in first hidden layer
         layer1_outputs = self.sigmoid(np.dot(inputs, self.weights1) + self.bias1)
@@ -110,11 +123,54 @@ class NeuralNetwork:
 
         return angle, direction, shoot
 
+class GeneticAlgorithm:
+    def __init__(self, population_size, num_input_features):
+        self.population_size = population_size
+        self.num_input_features = num_input_features
 
+    def initialize_population(self):
+        return Population
+
+    def fitness_function(self, player):
+        num_players_killed = player.kill
+        distance_walked = player.distance_walked
+
+        #Calculate fitness score of each individual on the population
+        player.fitness_score = num_players_killed + distance_walked
+        print("Fitness score of Player", player.id, "=", player.fitness_score)
+        return player.fitness_score
+
+    def select_parents(self, l):
+        for player in Players:
+            fitness_scores.append(player.fitness_score)
+
+        total_fitness = sum(fitness_scores)
+        if total_fitness == 0:
+            selection_probability = [1 / len(fitness_scores)] * len(fitness_scores)
+        else:
+            selection_probability = [self.fitness_function(player) / total_fitness for player in Population]  #divise the score of each ind at the total scores to get the probability
+        if l != 1:
+            for _ in range(len(Population)):
+                parent1_index = roulette_wheel_selection(selection_probability)
+                parent2_index = roulette_wheel_selection(selection_probability)
+                # print("\nparent1_index =", parent1_index)
+                # print("parent2_index =", parent2_index)
+                parents.append((parent1_index, parent2_index))
+                l = 1
+
+        return parents
+
+def roulette_wheel_selection(selection_probability):
+    sum_probability = [sum(selection_probability[:i + 1]) for i in range(len(selection_probability))]
+    r = random.random()  # r=> is used as a wheel indicator
+    for i, sum_prob in enumerate(sum_probability):
+        if r <= sum_prob:
+            return i
 
 class Player:
-    def __init__(self, images, x, y, initial_image_index, team):
+    def __init__(self, images, x, y, initial_image_index, team, id):
         self.network = NeuralNetwork(num_input_features)
+        self.id = id
         self.images = images
         self.image_index = initial_image_index
         self.image = self.images[self.image_index]  # Initial image
@@ -124,6 +180,9 @@ class Player:
         self.last_move_time = time.time()
         self.last_shot_time = time.time()
         self.injured = False
+        self.kill = 0
+        self.distance_walked = 0
+        self.fitness_score = 0
         self.x = x
         self.y = y
         self.last_rotation_time = time.time()
@@ -142,13 +201,19 @@ class Player:
 
     def handle_collision(self, players, All_Bulltes):
         for player in players:
-            for bullet in All_Bulltes:
+            for bullet in All_Bulltes[:]:
                 if bullet.rect.colliderect(player.rect):
+                    All_Bulltes.remove(bullet)
+                    if bullets.__contains__(bullet):
+                       bullets.remove(bullet)
                     # Check if the bullet belongs to the enemy team
                     if bullet.owner != player:
                         if player in players:
                              players.remove(player)
-                           # player.image_index = 4  # Change the image index of the hit player
+                             # player.image_index = 4  # Change the image index of the hit player
+                    if player == bullet.owner:
+                        self.kill += 1
+
 
     def update_sensors(self, obstacles, players):
         for i, angle in enumerate(self.sensor_angles):
@@ -246,8 +311,15 @@ class Player:
             # Calculate the new position
             new_x, new_y = self.collision_rect.x + dx * SQUARE_SIZE, self.collision_rect.y + dy * SQUARE_SIZE
 
+            # Calculate distance moved (using Euclidean distance formula)
+            distance_moved = ((dx ** 2) + (dy ** 2)) ** 0.5
+
+            # Accumulate total distance walked
+            self.distance_walked += distance_moved
+            # print("Player distance = ", self.distance_walked)
             # Create a temporary rectangle for the new position
             new_rect = pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE)
+
             # Check if the new position is not colliding with obstacles
             if not any(new_rect.colliderect(obstacle) for obstacle in obstacle_rects):
 
@@ -362,78 +434,69 @@ def draw_environment(screen, box_img, tile_img, players, Obstacles, bullets):
     for bullet in bullets:
         bullet.draw(screen)
 
-
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Intelligent Shooting Game")
 
-    # Load player images
-    player_images = []
-    Team_1 = []
-    Team_2 = []
+    # Initialize genetic algorithm parameters
+    population_size = 50
+    num_generations = 100
 
-    # Load images for each direction for each player
-    for i in range(1, 6):  # 5 players
+    for i in range(0, 60):  # 5 players
         images_1 = []
         for j in range(1, 6): # 4 positions
-            image_path = f"Images/Players/Player_1_{j}.png"
+            image_path = f"Images/Players/Player_5_{j}.png"
             image = pygame.image.load(image_path)
-            image = pygame.transform.scale(image, (40, 40))  # Resize to 50x50
+            image = pygame.transform.scale(image, (40, 40))
             images_1.append(image)
         player_images.append(images_1)
 
-    for i in range(1, 6):  # 5 players
-        images_2 = []
-        for j in range(1, 6):  # 4 positions
-            image_path = f"Images/Players/Player_5_{j}.png"
-            image = pygame.image.load(image_path)
-            image = pygame.transform.scale(image, (40, 40))  # Resize to 50x50
-            images_2.append(image)
-        player_images.append(images_2)
+    x_range = range(30)
+    y_range = range(15)
 
-    # Create player objects with fixed positions
-    players = [
-        #Team 1
-        Player(player_images[0], 6, 4, 3, 1),
-        Player(player_images[1], 8, 2, 3, 1),
-        Player(player_images[2], 1, 3, 3, 1),
-        Player(player_images[3], 3, 12, 3, 1),
-        Player(player_images[4], 8, 13, 3, 1),
+    # List to store the coordinates not in the obstacles list
+    players_coordinates = []
 
-        #Team 2
-        Player(player_images[5], 27, 7, 2, 2),
-        Player(player_images[6], 23, 2, 2, 2),
-        Player(player_images[7], 20, 13, 2, 2),
-        Player(player_images[8], 24, 3, 2, 2),
-        Player(player_images[9], 25, 10, 2, 2)
-    ]
+    # Iterate over each possible (x, y) coordinate
+    for x in x_range:
+        for y in y_range:
+            if (x, y) not in Obstacles:
+                players_coordinates.append((x, y))
 
-    # Load images and resize them
+    for v in range(60):
+        team = random.choice([1, 2])
+        coord = random.choice(players_coordinates)
+        player = Player(player_images[v], coord[0], coord[1], 3, team, v)
+        Players.append(player)
+
+    # Create a genetic algorithm instance
+    ga = GeneticAlgorithm(population_size, num_input_features)
+
+    # Select parents using the genetic algorithm
+    print("selected Parents  = ", ga.select_parents(l))
+
     box_img = pygame.image.load("Images/Obstacles/Box.jpg")
     box_img = pygame.transform.scale(box_img, (SQUARE_SIZE, SQUARE_SIZE))
 
     tile_img = pygame.image.load("Images/Obstacles/Stone_Tile.jpg")  # Load the image
     tile_img = pygame.transform.scale(tile_img, (SQUARE_SIZE, SQUARE_SIZE))
 
-    # Flatten the obstacles into a 1D array
-    obstacle_inputs = np.array(Obstacles).flatten()
-
     # Make sure the number of input features matches the length of the flattened array
-    num_input_features = len(obstacle_inputs)
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-        for player in players:
+        for player in Players:
             if player.team == 1:
                 friends = [p.rect.center for p in Team_1 if p != player]  # Extract positions of friendly players
                 enemies = [p.rect.center for p in Team_2]  # Extract positions of enemy players
             elif player.team == 2:
                 friends = [p.rect.center for p in Team_2 if p != player]  # Extract positions of friendly players
                 enemies = [p.rect.center for p in Team_1]  # Extract positions of enemy players
+
 
             # Use the network to predict the game actions
             angle, direction, shooting = player.network.predict(obstacle_inputs, friends, enemies)
@@ -453,7 +516,7 @@ def main():
                 # print("Shoot!!")
                 shoot(player, bullets, bullet_image, -Neural_angle)
                 check_bullet_collision(bullets, obstacle_rects)
-                player.handle_collision(players, All_Bulltes)
+                player.handle_collision(Players, All_Bulltes)
 
 
             # Update player's image rotation
@@ -462,20 +525,23 @@ def main():
             player.rect = player.image.get_rect()
             player.rect.center = center
 
-
         # Move and draw bullets
         for bullet in bullets:
             bullet.move()
             bullet.draw(screen)
             All_Bulltes.append(bullet)
 
+
         screen.fill((255, 255, 255))
-        draw_environment(screen, box_img, tile_img, players, Obstacles, bullets)
+        draw_environment(screen, box_img, tile_img, Players, Obstacles, bullets)
         pygame.display.flip()
+
 
     pygame.quit()
     sys.exit()
 
 if __name__ == "__main__":
     main()
-  
+
+
+
