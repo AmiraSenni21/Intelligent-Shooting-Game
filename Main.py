@@ -43,13 +43,12 @@ Neural_angle = 0
 friends = []
 enemies = []
 All_Bulltes = []
-player_images = []   # Load player images
+player_images = [] # Load player images
 Players = []
 Team_1 = []
 Team_2 = []
 Population =[]
 fitness_scores = []
-l=0
 parents = []
 class NeuralNetwork:
     def __init__(self, num_input_features):
@@ -132,15 +131,16 @@ class GeneticAlgorithm:
         return Population
 
     def fitness_function(self, player):
-        num_players_killed = player.kill
+        Kill_Friend = player.kill_Friend
+        Kill_Enemy = player.kill_Enemy
         distance_walked = player.distance_walked
 
         #Calculate fitness score of each individual on the population
-        player.fitness_score = num_players_killed + distance_walked
-        print("Fitness score of Player", player.id, "=", player.fitness_score)
+        player.fitness_score = Kill_Friend + Kill_Enemy
+        # print("Fitness score of Player", player.id, "=", player.fitness_score)
         return player.fitness_score
 
-    def select_parents(self, l):
+    def select_parents(self):
         for player in Players:
             fitness_scores.append(player.fitness_score)
 
@@ -149,14 +149,13 @@ class GeneticAlgorithm:
             selection_probability = [1 / len(fitness_scores)] * len(fitness_scores)
         else:
             selection_probability = [self.fitness_function(player) / total_fitness for player in Population]  #divise the score of each ind at the total scores to get the probability
-        if l != 1:
-            for _ in range(len(Population)):
-                parent1_index = roulette_wheel_selection(selection_probability)
-                parent2_index = roulette_wheel_selection(selection_probability)
-                # print("\nparent1_index =", parent1_index)
-                # print("parent2_index =", parent2_index)
-                parents.append((parent1_index, parent2_index))
-                l = 1
+
+        for _ in range(len(Population)):
+            parent1_index = roulette_wheel_selection(selection_probability)
+            parent2_index = roulette_wheel_selection(selection_probability)
+            # print("\nparent1_index =", parent1_index)
+            # print("parent2_index =", parent2_index)
+            parents.append((parent1_index, parent2_index))
 
         return parents
 
@@ -179,8 +178,9 @@ class Player:
         self.rect.topleft = (x * SQUARE_SIZE, y * SQUARE_SIZE)
         self.last_move_time = time.time()
         self.last_shot_time = time.time()
-        self.injured = False
-        self.kill = 0
+        self.alive = True
+        self.kill_Friend = 0
+        self.kill_Enemy = 0
         self.distance_walked = 0
         self.fitness_score = 0
         self.x = x
@@ -201,19 +201,23 @@ class Player:
 
     def handle_collision(self, players, All_Bulltes):
         for player in players:
-            for bullet in All_Bulltes[:]:
-                if bullet.rect.colliderect(player.rect):
-                    All_Bulltes.remove(bullet)
-                    if bullets.__contains__(bullet):
-                       bullets.remove(bullet)
-                    # Check if the bullet belongs to the enemy team
-                    if bullet.owner != player:
-                        if player in players:
-                             players.remove(player)
-                             # player.image_index = 4  # Change the image index of the hit player
-                    if player == bullet.owner:
-                        self.kill += 1
-
+            if player != self:
+                for bullet in All_Bulltes[:]:
+                    if bullet.rect.colliderect(player.rect):
+                        All_Bulltes.remove(bullet)
+                        if bullets.__contains__(bullet):
+                            bullets.remove(bullet)
+                        # Check if the bullet belongs to the enemy team
+                        if bullet.owner != player:
+                            if player in players and player.alive == True:
+                                # players.remove(player)
+                                player.alive = False
+                                # Increment kill counts based on teams
+                                if player.team == 1:
+                                    self.kill_Friend += 1
+                                else:
+                                    self.kill_Enemy += 1
+                            break  # Exit the inner loop after removing the player
 
     def update_sensors(self, obstacles, players):
         for i, angle in enumerate(self.sensor_angles):
@@ -305,7 +309,7 @@ class Player:
                 # Draw player image
                 screen.blit(self.image, self.collision_rect)
 
-    def move(self, dx, dy, obstacles):
+    def move(self, dx, dy):
         current_time = time.time()
         if current_time - self.last_move_time >= PLAYER_MOVE_DELAY:
             # Calculate the new position
@@ -315,8 +319,8 @@ class Player:
             distance_moved = ((dx ** 2) + (dy ** 2)) ** 0.5
 
             # Accumulate total distance walked
-            self.distance_walked += distance_moved
-            # print("Player distance = ", self.distance_walked)
+            self.distance_walked += 1
+
             # Create a temporary rectangle for the new position
             new_rect = pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE)
 
@@ -379,7 +383,7 @@ class Bullet:
         screen.blit(self.image, self.rect)
 
 def shoot(player, bullets, bullet_image, angle):
-    if player.can_shoot():
+    if player.can_shoot() and player.alive == True:
         # Determine bullet direction based on player direction
         if player.image_index != 4:  # died
             if player.image_index == 0:  # Up
@@ -428,7 +432,8 @@ def draw_environment(screen, box_img, tile_img, players, Obstacles, bullets):
 
     # Draw players
     for player in players:
-        player.draw(screen, obstacle_rects, players)
+        if player.alive == True:
+           player.draw(screen, obstacle_rects, players)
 
     # Draw bullets
     for bullet in bullets:
@@ -440,10 +445,10 @@ def main():
     pygame.display.set_caption("Intelligent Shooting Game")
 
     # Initialize genetic algorithm parameters
-    population_size = 50
+    population_size = 2
     num_generations = 100
 
-    for i in range(0, 60):  # 5 players
+    for i in range(0, population_size):  # 5 players
         images_1 = []
         for j in range(1, 6): # 4 positions
             image_path = f"Images/Players/Player_5_{j}.png"
@@ -464,17 +469,22 @@ def main():
             if (x, y) not in Obstacles:
                 players_coordinates.append((x, y))
 
-    for v in range(60):
+    for v in range(population_size):
         team = random.choice([1, 2])
         coord = random.choice(players_coordinates)
-        player = Player(player_images[v], coord[0], coord[1], 3, team, v)
-        Players.append(player)
+        if v < population_size/2:
+            player = Player(player_images[v], coord[0], coord[1], 3, 1, v)
+            Players.append(player)
+        else:
+            player = Player(player_images[v], coord[0], coord[1], 3, 2, v)
+            Players.append(player)
 
     # Create a genetic algorithm instance
     ga = GeneticAlgorithm(population_size, num_input_features)
 
     # Select parents using the genetic algorithm
-    print("selected Parents  = ", ga.select_parents(l))
+    parents = ga.select_parents()
+
 
     box_img = pygame.image.load("Images/Obstacles/Box.jpg")
     box_img = pygame.transform.scale(box_img, (SQUARE_SIZE, SQUARE_SIZE))
@@ -503,21 +513,14 @@ def main():
 
             # Update player's direction continuously
             dx, dy = direction
-            player.move(dx, dy, Obstacles)
+            player.move(dx, dy)
             Neural_angle = angle
-
-            # print("Player = ", player)
-            # print("Direction_0 = ", direction[0])
-            # print("Direction_1 = ", direction[1])
-            # print("Shooting = ", shooting)
 
             # Check if the neural network predicts shooting
             if shooting == 1:
-                # print("Shoot!!")
                 shoot(player, bullets, bullet_image, -Neural_angle)
                 check_bullet_collision(bullets, obstacle_rects)
                 player.handle_collision(Players, All_Bulltes)
-
 
             # Update player's image rotation
             center = player.rect.center
@@ -531,17 +534,20 @@ def main():
             bullet.draw(screen)
             All_Bulltes.append(bullet)
 
-
         screen.fill((255, 255, 255))
         draw_environment(screen, box_img, tile_img, Players, Obstacles, bullets)
         pygame.display.flip()
 
+    for p in Players:
+        print("\nPlayer fitness ", p.id, " = ", p.fitness_score)
+        print("Player walking ", p.id, " = ", p.distance_walked)
+        print("Player kill friends = ", p.kill_Friend, " ///// Player kill enemies = ", p.kill_Enemy)
 
+
+    print("\nselected Parents  = ", parents)
     pygame.quit()
     sys.exit()
 
 if __name__ == "__main__":
     main()
-
-
 
