@@ -20,7 +20,8 @@ NUM_SENSORS = 6
 bullets = []
 bullet_image = pygame.image.load("Images/Obstacles/Bullet.png")
 bullet_image = pygame.transform.scale(bullet_image, (10, 10))
-Obstacles = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0, 10),
+Obstacles = [(13, 1), (5, 9), (18, 5), (10, 8), (26, 6), (26, 5), (26, 4),
+             (0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0, 10),
              (0, 11), (0, 12), (0, 13), (0, 14), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0),
              (8, 0), (9, 0), (10, 0), (11, 0), (12, 0), (13, 0), (14, 0), (15, 0), (16, 0), (17, 0),
              (18, 0), (19, 0), (20, 0), (21, 0), (22, 0), (23, 0), (24, 0), (25, 0), (26, 0), (27, 0),
@@ -36,20 +37,20 @@ Obstacles = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0,
              (18, 6),(19, 6),(10, 7),(10, 9), (9, 8), (11, 8),(15, 7), (15, 8),(15, 9), (16, 9), (17, 9),
              (18, 9),(17, 8),(18, 10), (23, 7), (24, 7), (25, 7), (26, 7), (23, 8), (23, 9), (23, 10), (23, 11), (23, 12)]
 obstacle_inputs = np.array(Obstacles).flatten()  # Flatten the obstacles into a 1D array
-obstacle_rects = [pygame.Rect(coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
-                      for coord in Obstacles]
+obstacle_rects = [pygame.Rect(coord[0] * SQUARE_SIZE, coord[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE) for coord in Obstacles]
 num_input_features = len(Obstacles) * 2
 Neural_angle = 0
 friends = []
 enemies = []
 All_Bulltes = []
-player_images = [] # Load player images
+player_images = []  #Load player images
 Players = []
 Team_1 = []
 Team_2 = []
 Population =[]
 fitness_scores = []
 parents = []
+
 class NeuralNetwork:
     def __init__(self, num_input_features):
         # Initialize weights and biases for:
@@ -136,28 +137,26 @@ class GeneticAlgorithm:
         distance_walked = player.distance_walked
 
         #Calculate fitness score of each individual on the population
-        player.fitness_score = Kill_Friend + Kill_Enemy
-        # print("Fitness score of Player", player.id, "=", player.fitness_score)
+        player.fitness_score = 0.5 * distance_walked - Kill_Friend + 2 * Kill_Enemy
         return player.fitness_score
 
     def select_parents(self):
-        for player in Players:
+        for player in Players:  # Iterate over actual player instances
             fitness_scores.append(player.fitness_score)
 
         total_fitness = sum(fitness_scores)
         if total_fitness == 0:
             selection_probability = [1 / len(fitness_scores)] * len(fitness_scores)
         else:
-            selection_probability = [self.fitness_function(player) / total_fitness for player in Population]  #divise the score of each ind at the total scores to get the probability
+            selection_probability = [player.fitness_score / total_fitness for player in Players]
 
         for _ in range(len(Population)):
             parent1_index = roulette_wheel_selection(selection_probability)
             parent2_index = roulette_wheel_selection(selection_probability)
-            # print("\nparent1_index =", parent1_index)
-            # print("parent2_index =", parent2_index)
             parents.append((parent1_index, parent2_index))
 
         return parents
+
 
 def roulette_wheel_selection(selection_probability):
     sum_probability = [sum(selection_probability[:i + 1]) for i in range(len(selection_probability))]
@@ -316,10 +315,7 @@ class Player:
             new_x, new_y = self.collision_rect.x + dx * SQUARE_SIZE, self.collision_rect.y + dy * SQUARE_SIZE
 
             # Calculate distance moved (using Euclidean distance formula)
-            distance_moved = ((dx ** 2) + (dy ** 2)) ** 0.5
-
-            # Accumulate total distance walked
-            self.distance_walked += 1
+            distance_moved = ((dx ** 2) + (dy ** 2)) ** 0.
 
             # Create a temporary rectangle for the new position
             new_rect = pygame.Rect(new_x, new_y, SQUARE_SIZE, SQUARE_SIZE)
@@ -343,6 +339,9 @@ class Player:
 
                 self.image = self.images[self.image_index]
                 self.last_move_time = current_time  # Update the last move time
+
+                # Increment distance_walked by 1 for each move
+                self.distance_walked += 1
 
                 # Update the player's angle
                 if dx != 0 or dy != 0:
@@ -445,7 +444,7 @@ def main():
     pygame.display.set_caption("Intelligent Shooting Game")
 
     # Initialize genetic algorithm parameters
-    population_size = 2
+    population_size = 50
     num_generations = 100
 
     for i in range(0, population_size):  # 5 players
@@ -482,10 +481,6 @@ def main():
     # Create a genetic algorithm instance
     ga = GeneticAlgorithm(population_size, num_input_features)
 
-    # Select parents using the genetic algorithm
-    parents = ga.select_parents()
-
-
     box_img = pygame.image.load("Images/Obstacles/Box.jpg")
     box_img = pygame.transform.scale(box_img, (SQUARE_SIZE, SQUARE_SIZE))
 
@@ -516,11 +511,17 @@ def main():
             player.move(dx, dy)
             Neural_angle = angle
 
+            # print("Player = ", player)
+            # print("Direction_0 = ", direction[0])
+            # print("Direction_1 = ", direction[1])
+            # print("Shooting = ", shooting)
+
             # Check if the neural network predicts shooting
             if shooting == 1:
                 shoot(player, bullets, bullet_image, -Neural_angle)
                 check_bullet_collision(bullets, obstacle_rects)
                 player.handle_collision(Players, All_Bulltes)
+
 
             # Update player's image rotation
             center = player.rect.center
@@ -539,12 +540,21 @@ def main():
         pygame.display.flip()
 
     for p in Players:
-        print("\nPlayer fitness ", p.id, " = ", p.fitness_score)
-        print("Player walking ", p.id, " = ", p.distance_walked)
-        print("Player kill friends = ", p.kill_Friend, " ///// Player kill enemies = ", p.kill_Enemy)
+        print("\nPlayer fitness ", p.id, " = ", ga.fitness_function(p))
+        print("walking = ", p.distance_walked, "/ kill friends = ", p.kill_Friend," / kill enemies = ", p.kill_Enemy)
 
-
+    parents = ga.select_parents()
+    # Select parents using the genetic algorithm
     print("\nselected Parents  = ", parents)
+
+    # Select parents using the genetic algorithm
+    # print("Individual_0 = ", Population[0])
+    # print("Individual_00 = ", Population[0][0])
+    # print("Individual_01 = ", Population[0][1])
+    # print("Individual_02 = ", Population[0][2])
+
+
+
     pygame.quit()
     sys.exit()
 
