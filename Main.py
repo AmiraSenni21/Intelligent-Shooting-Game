@@ -49,7 +49,8 @@ Team_1 = []
 Team_2 = []
 Population =[]
 fitness_scores = []
-parents = []
+Parents = []
+parentsInd = []
 
 class NeuralNetwork:
     def __init__(self, num_input_features):
@@ -124,9 +125,10 @@ class NeuralNetwork:
         return angle, direction, shoot
 
 class GeneticAlgorithm:
-    def __init__(self, population_size, num_input_features):
+    def __init__(self, num_generations, population_size, mutation_rate):
+        self.num_generations = num_generations
         self.population_size = population_size
-        self.num_input_features = num_input_features
+        self.mutation_rate = mutation_rate
 
     def initialize_population(self):
         return Population
@@ -150,13 +152,38 @@ class GeneticAlgorithm:
         else:
             selection_probability = [player.fitness_score / total_fitness for player in Players]
 
-        for _ in range(len(Population)):
-            parent1_index = roulette_wheel_selection(selection_probability)
-            parent2_index = roulette_wheel_selection(selection_probability)
-            parents.append((parent1_index, parent2_index))
+        parent1_index = roulette_wheel_selection(selection_probability)
+        parent2_index = roulette_wheel_selection(selection_probability)
 
-        return parents
+        Parents.append((parent1_index, parent2_index))
+        parentsInd.append((Population[parent1_index], Population[parent2_index]))
 
+        return Population[parent1_index], Population[parent2_index]
+
+
+    def crossover(self, parent1, parent2):
+        # Randomly select crossover point
+        crossover_point = random.randint(0, len(parent1) - 1)
+
+        # Generate offsprings
+        offspring1 = parent1[:crossover_point] + parent2[crossover_point:]
+        offspring2 = parent2[:crossover_point] + parent1[crossover_point:]
+
+        return offspring1, offspring2
+
+    def mutation(self, individual):
+        mutated_individual = list(individual)  # Create a copy of the original individual
+        if random.random() < self.mutation_rate:
+            # Select a random gene index to mutate
+            gene_index = random.randint(0, len(individual) - 1)
+
+            # Mutate the selected gene
+            mutated_gene = individual[gene_index] + np.random.normal(scale=0.1)  # To apply minor adjustements to the value of the selected gene
+
+            # Update the mutated gene in the copied individual
+            mutated_individual[gene_index] = mutated_gene
+
+        return mutated_individual
 
 def roulette_wheel_selection(selection_probability):
     sum_probability = [sum(selection_probability[:i + 1]) for i in range(len(selection_probability))]
@@ -445,12 +472,13 @@ def main():
 
     # Initialize genetic algorithm parameters
     population_size = 50
+    mutation_rate = 0.1
     num_generations = 100
 
     for i in range(0, population_size):  # 5 players
         images_1 = []
-        for j in range(1, 6): # 4 positions
-            image_path = f"Images/Players/Player_5_{j}.png"
+        for j in range(1, 5): # 4 positions
+            image_path = f"Images/Players/Player_3_{j}.png"
             image = pygame.image.load(image_path)
             image = pygame.transform.scale(image, (40, 40))
             images_1.append(image)
@@ -469,7 +497,6 @@ def main():
                 players_coordinates.append((x, y))
 
     for v in range(population_size):
-        team = random.choice([1, 2])
         coord = random.choice(players_coordinates)
         if v < population_size/2:
             player = Player(player_images[v], coord[0], coord[1], 3, 1, v)
@@ -479,7 +506,7 @@ def main():
             Players.append(player)
 
     # Create a genetic algorithm instance
-    ga = GeneticAlgorithm(population_size, num_input_features)
+    ga = GeneticAlgorithm(num_generations, population_size, mutation_rate)
 
     box_img = pygame.image.load("Images/Obstacles/Box.jpg")
     box_img = pygame.transform.scale(box_img, (SQUARE_SIZE, SQUARE_SIZE))
@@ -511,11 +538,6 @@ def main():
             player.move(dx, dy)
             Neural_angle = angle
 
-            # print("Player = ", player)
-            # print("Direction_0 = ", direction[0])
-            # print("Direction_1 = ", direction[1])
-            # print("Shooting = ", shooting)
-
             # Check if the neural network predicts shooting
             if shooting == 1:
                 shoot(player, bullets, bullet_image, -Neural_angle)
@@ -543,16 +565,10 @@ def main():
         print("\nPlayer fitness ", p.id, " = ", ga.fitness_function(p))
         print("walking = ", p.distance_walked, "/ kill friends = ", p.kill_Friend," / kill enemies = ", p.kill_Enemy)
 
-    parents = ga.select_parents()
+    parents_Info = ga.select_parents()
+    
     # Select parents using the genetic algorithm
-    print("\nselected Parents  = ", parents)
-
-    # Select parents using the genetic algorithm
-    # print("Individual_0 = ", Population[0])
-    # print("Individual_00 = ", Population[0][0])
-    # print("Individual_01 = ", Population[0][1])
-    # print("Individual_02 = ", Population[0][2])
-
+    print("\nFirst Parents  = ", Parents)
 
 
     pygame.quit()
@@ -560,4 +576,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
