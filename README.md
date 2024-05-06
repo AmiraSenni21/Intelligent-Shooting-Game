@@ -13,3 +13,9 @@ First RNN random with no learning
 29/04/2024
 Fitness kill+distance
 Sélection roulette
+
+Last check
+fitness 0.5 distance - kill_friend + 2 kill_enemy
+crossover 1 point
+mutation 1 point
+NO GA APPLIED ON EXECUTION
